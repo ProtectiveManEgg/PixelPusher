@@ -161,8 +161,6 @@ class pixelPusher:
 			for i in range(len(config)):
 				config[i]["channel"] = i + 1
 			
-		print(config)
-		
 		return self.success(req, body = json.dumps(config), encoded = True)
 
 	def enableUDP(self, req: Request):
