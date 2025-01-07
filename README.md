@@ -1,3 +1,4 @@
+This library is not capable of processing within microseconds of transmissions. Channel 2 is sent within rapid succession as channel 1. It will never be capable of receiving those packets with any sort of effectiveness. must be used with the `singleChannel` flag set to `True`. Micropython _should_ be capable but not certain. Will take another look at Micropython.
 
 # PixelPusher
 This project is a deconstruction of [DarthAffe's](https://github.com/DarthAffe) [NodeMCU sketch](https://github.com/DarthAffe/RGB.NET/blob/master/RGB.NET.Devices.WS281X/Sketches/RGB.NET_NodeMCU.ino). I wanted the simplicity of using Python, and CircuitPython seemed like a good choice.
@@ -33,7 +34,7 @@ channels = [			# max channels 4
 brightness = 100		# pixelPusher defaults to 50% brightness
 
 #pusher(ssid: str, passw: str, brightness: int = 50, channels: list = None)
-pusher("awesome wifi", "password", brightness = brightness, channels = channels)
+pusher("awesome wifi", "password", brightness = brightness, channels = channels, singleChannel = True)
 ```
 
 ## Notes to self:
