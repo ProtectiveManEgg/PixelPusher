@@ -1,16 +1,24 @@
 from .pixelPusher import pixelPusher
 
-def pusher(ssid, passw, brightness = 50, channels = None):
+def pusher(ssid, passw, brightness = 50, channels = None, singleChannel = False):
 	# default brightness at 50%
 	if channels is None:
 		raise print("Channels not set!", err = True)
-		
-	if len(channels) < 4:
-		for i in range(4 - len(channels)):
-			channels.insert(len(channels) + i, [None, 0])
+	
+	if singleChannel:
+		most_leds = 0
+		for channel in channels:
+			print(channel, channel[1])
+			if channel[1] > most_leds:
+				pixelPusher.highest_channel = channel
+	else:
+		if len(channels) < 4:
+			for i in range(4 - len(channels)):
+				channels.insert(len(channels) + i, [None, 0])
 	print(channels)
 	
 	pixelPusher.channels = channels
+	pixelPusher.singleChannel = singleChannel
 	pixelPusher.brightness = (brightness / 100)
 	pixelPusher.buff_size = (pixelPusher.trueMax(pixelPusher, channels) * 3) + 2
 	

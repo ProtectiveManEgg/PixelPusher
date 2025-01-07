@@ -36,7 +36,7 @@ class pixelPusher:
 				self.pixels[i].fill((0, 0, 255))
 				self.pixels[i].show()
 			
-		print(f"Initiated {len(self.pixels)} channels")
+		print(f"Initiated {len(self.pixels)} channels {self.singleChannel and 'running in single channel mode' or ''}")
 		
 		self.connectWLAN(ssid, passw)
 		if wifi.radio.connected:
@@ -130,14 +130,29 @@ class pixelPusher:
 				buff = bytearray(self.buff_size)
 				size, _ = self.udp.recvfrom_into(buff)
 				seq, channel, b_list = buff[0], buff[1] - 1, list(buff[2:])
+				# should send the channel, but it's losing packets
 				
-				for i in range(self.channels[channel][1]):
-					self.pixels[channel][i] = (
-						int(b_list[(i * 3)]* self.brightness), 		# R index / brightness
-						int(b_list[(i * 3) + 1] * self.brightness), # G index / brightness
-						int(b_list[(i * 3) + 2] * self.brightness) 	# B index / brightness
-					)
-				self.pixels[channel].show()
+				if self.singleChannel:
+					# duplicate channels
+					# strips are "freezing" up and stop writing after a few
+					# seconds. dunno why
+					for channel in range(len(self.channels)):
+						for i in range(self.channels[channel][1]):
+							# going by channel leds prevents writing too many "pixels" in the strip
+							self.pixels[channel][i] = (
+								int(b_list[(i * 3)]* self.brightness), 		# R index / brightness
+								int(b_list[(i * 3) + 1] * self.brightness), # G index / brightness
+								int(b_list[(i * 3) + 2] * self.brightness) 	# B index / brightness
+							)
+						self.pixels[channel].show()
+				else:
+					for i in range(self.channels[channel][1]):
+						self.pixels[channel][i] = (
+							int(b_list[(i * 3)]* self.brightness), 		# R index / brightness
+							int(b_list[(i * 3) + 1] * self.brightness), # G index / brightness
+							int(b_list[(i * 3) + 2] * self.brightness) 	# B index / brightness
+						)
+					self.pixels[channel].show()
 			except KeyboardInterrupt:
 				print("Interrupted by user!")
 				self.reboot()
@@ -149,14 +164,27 @@ class pixelPusher:
 		return FileResponse(req, "/root.html")
 		
 	def serveConfig(self, req: Request):
-		config = [
-			{"enabled": (self.ips["client"] is not None and True or False), "port": self.ports["udp"]},
-			{"channel": str(self.channels[0][0]), "leds": self.channels[0][1]},
-			{"channel": str(self.channels[1][0]), "leds": self.channels[1][1]},
-			{"channel": str(self.channels[2][0]), "leds": self.channels[2][1]},
-			{"channel": str(self.channels[3][0]), "leds": self.channels[3][1]}
-		]
-		if not req.query_params.get("root"): # artemis can't handle the udp index
+		if self.singleChannel:
+			config = [
+				{"enabled": (self.ips["client"] is not None and True or False), "port": self.ports["udp"]},
+				{"channel": 1, "leds": self.highest_channel[1]},
+				{"channel": 2, "leds": 0},
+				{"channel": 3, "leds": 0},
+				{"channel": 4, "leds": 0}
+			]
+			print(config)
+		else:
+			config = [
+				{"enabled": (self.ips["client"] is not None and True or False), "port": self.ports["udp"]},
+				{"channel": str(self.channels[0][0]), "leds": self.channels[0][1]},
+				{"channel": str(self.channels[1][0]), "leds": self.channels[1][1]},
+				{"channel": str(self.channels[2][0]), "leds": self.channels[2][1]},
+				{"channel": str(self.channels[3][0]), "leds": self.channels[3][1]}
+			]
+		if not req.query_params.get("root"):
+			# artemis can't handle the udp index
+			# in testing; probably non-numeric or out of order
+			print("bad channel indexes")
 			del config[:1]
 			for i in range(len(config)):
 				config[i]["channel"] = i + 1
