@@ -4,6 +4,8 @@ import json
 import microcontroller as mc
 import time
 import builtins
+import asyncio
+import random as rand
 
 from socketpool import SocketPool as socketpool
 from adafruit_httpserver import Server, Request, Response, FileResponse, Route, GET, POST
@@ -33,7 +35,7 @@ class pixelPusher:
 		for i in range(len(self.channels)):
 			if self.channels[i][1] > 0: # only init channels with leds
 				self.pixels.insert(i, NeoPixel(self.channels[i][0], self.channels[i][1], auto_write = False))
-				self.pixels[i].fill((0, 0, 255))
+				self.pixels[i].fill((rand.randint(1, 255), rand.randint(1, 255), rand.randint(1, 255))) # ensure different color per boot to differentiate runs
 				self.pixels[i].show()
 			
 		print(f"Initiated {len(self.pixels)} channels {self.singleChannel and 'running in single channel mode' or ''}")
@@ -51,6 +53,7 @@ class pixelPusher:
 		self.server = Server(self.pool, debug = True, root_path = "/sd")
 		
 		self.udp = self.createSock(self.ips["host"], self.ports["udp"], timeout = 0.01, udp = True)
+		self.udp.setblocking(False) # this hasn't worked in the past *********
 		
 		self.server.add_routes([
 			Route("/", [GET, POST], self.serveRoot),
@@ -63,9 +66,10 @@ class pixelPusher:
 		
 		self.server.start(self.ips["host"], port = self.ports["tcp"])
 		
-		await gather( # could probably just use create_task, but this serves to remind
+		asyncio.run(self.poll())
+		'''await gather( # could probably just use create_task, but this serves to remind
 			create_task(self.poll())
-		)
+		)'''
 			
 	# [ utilities ] -------------
 	def createSock(self, ip, port, timeout = 1, udp = False):
@@ -130,6 +134,9 @@ class pixelPusher:
 				buff = bytearray(self.buff_size)
 				size, _ = self.udp.recvfrom_into(buff)
 				seq, channel, b_list = buff[0], buff[1] - 1, list(buff[2:])
+				
+				#data, addr = await loop.sock_recvfrom(udp, self.buff_size)
+				#print(addr, data)
 				# should send the channel, but it's losing packets
 				
 				if self.singleChannel:
@@ -146,18 +153,23 @@ class pixelPusher:
 							)
 						self.pixels[channel].show()
 				else:
-					for i in range(self.channels[channel][1]):
-						self.pixels[channel][i] = (
-							int(b_list[(i * 3)]* self.brightness), 		# R index / brightness
-							int(b_list[(i * 3) + 1] * self.brightness), # G index / brightness
-							int(b_list[(i * 3) + 2] * self.brightness) 	# B index / brightness
-						)
-					self.pixels[channel].show()
+					create_task(self.processUDP(seq, channel, b_list))
+					
 			except KeyboardInterrupt:
 				print("Interrupted by user!")
 				self.reboot()
 			except OSError as e: # skip over etimedout
-				pass 
+				pass
+			
+	async def processUDP(self, seq, channel, b_list):
+		for i in range(self.channels[channel][1]):
+			self.pixels[channel][i] = (
+				int(b_list[(i * 3)]* self.brightness), 		# R index / brightness
+				int(b_list[(i * 3) + 1] * self.brightness), # G index / brightness
+				int(b_list[(i * 3) + 2] * self.brightness) 	# B index / brightness
+			)
+		self.pixels[channel].show()
+		await async_sleep(0)
 		
 	# [ server routes ] -------------	
 	def serveRoot(self, req: Request): # i would like to stylize this better tho
